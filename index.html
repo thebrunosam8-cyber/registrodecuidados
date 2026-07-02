@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BabyJr - Sistema de Vendas e Carga Múltipla</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, 'Segoe UI', Roboto, sans-serif; }
+        body { background: #f0f2f5; padding: 2rem; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { text-align: center; color: #1e293b; margin-bottom: 2rem; }
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; border-bottom: 2px solid #cbd5e1; flex-wrap: wrap; }
+        .tab-btn { background: #e2e8f0; border: none; padding: 0.75rem 1.5rem; font-weight: 600; border-radius: 8px 8px 0 0; cursor: pointer; }
+        .tab-btn.active { background: #3b82f6; color: white; }
+        .tab-content { display: none; background: white; border-radius: 0 0 20px 20px; padding: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .tab-content.active { display: block; }
+        .form-row { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; align-items: flex-end; }
+        .form-group { flex: 1; min-width: 180px; }
+        label { display: block; font-weight: 600; margin-bottom: 0.3rem; color: #334155; }
+        input, select { width: 100%; padding: 0.7rem; border: 1px solid #cbd5e1; border-radius: 8px; }
+        button { background: #3b82f6; color: white; border: none; padding: 0.7rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #2563eb; }
+        .btn-danger { background: #ef4444; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { background: #64748b; }
+        .btn-secondary:hover { background: #475569; }
+        .btn-success { background: #10b981; }
+        .btn-success:hover { background: #059669; }
+        .btn-print { background: #f59e0b; }
+        .btn-print:hover { background: #d97706; }
+        .btn-excel { background: #1e7e34; }
+        .btn-excel:hover { background: #16632a; }
+        .table-wrapper { overflow-x: auto; margin-top: 2rem; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { border: 1px solid #e2e8f0; padding: 0.75rem; text-align: left; }
+        th { background: #f8fafc; }
+        .actions button { margin-right: 0.5rem; padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+        .carga-area, .venda-area { display: flex; flex-direction: column; gap: 1.5rem; }
+        .select-cliente-produto { display: flex; gap: 1rem; flex-wrap: wrap; }
+        .total-carga { text-align: right; font-size: 1.4rem; font-weight: bold; margin-top: 1rem; padding: 1rem; background: #f1f5f9; border-radius: 12px; }
+        .finalizar { display: flex; justify-content: flex-end; gap: 1rem; flex-wrap: wrap; }
+        .historico, .historico-carga { max-height: 500px; overflow-y: auto; }
+        .historico-header, .historico-carga-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; }
+        .filtro-periodo { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
+        .print-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .print-modal-content { background: white; max-width: 800px; width: 90%; max-height: 90%; overflow-y: auto; border-radius: 12px; padding: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .print-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #e2e8f0; }
+        .close-modal { background: #ef4444; padding: 5px 15px; }
+        .modal-buttons { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 20px; }
+        .cliente-card { background: #f9f9ff; margin-bottom: 1.5rem; padding: 1rem; border-radius: 12px; border-left: 4px solid #3b82f6; }
+        .small-table { width: 100%; font-size: 0.85rem; }
+        .small-table th, .small-table td { padding: 6px; border: 1px solid #ccc; }
+    </style>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <h1>🛒 BabyJr - Vendas & Pedido de Carga (Vários Clientes)</h1>
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="clientes">👥 Clientes</button>
+        <button class="tab-btn" data-tab="produtos">📦 Produtos</button>
+        <button class="tab-btn" data-tab="venda">💸 Nova Venda</button>
+        <button class="tab-btn" data-tab="carga">🚛 Pedido de Carga (Multiclientes)</button>
+        <button class="tab-btn" data-tab="historico">📜 Histórico de Vendas</button>
+        <button class="tab-btn" data-tab="historicoCarga">📋 Histórico de Cargas</button>
+    </div>
+
+    <!-- Abas de cadastro -->
+    <div id="clientes" class="tab-content active">
+        <h2>Cadastro de Clientes</h2>
+        <div class="form-row">
+            <div class="form-group"><label>Nome</label><input type="text" id="cliNome"></div>
+            <div class="form-group"><label>CPF/CNPJ</label><input type="text" id="cliDoc"></div>
+            <div class="form-group"><label>Telefone</label><input type="text" id="cliFone"></div>
+            <div><button id="btnAddCliente">➕ Adicionar</button></div>
+        </div>
+        <div class="table-wrapper"><table id="tabelaClientes"><thead><tr><th>ID</th><th>Nome</th><th>Documento</th><th>Telefone</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <div id="produtos" class="tab-content">
+        <h2>Cadastro de Produtos</h2>
+        <div class="form-row">
+            <div class="form-group"><label>Produto</label><input type="text" id="prodNome"></div>
+            <div class="form-group"><label>Preço (R$)</label><input type="number" id="prodPreco" step="0.01"></div>
+            <div><button id="btnAddProduto">➕ Adicionar</button></div>
+        </div>
+        <div class="table-wrapper"><table id="tabelaProdutos"><thead><tr><th>ID</th><th>Produto</th><th>Preço</th><th>Ações</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- Aba Venda Normal -->
+    <div id="venda" class="tab-content">
+        <h2>🛍️ Realizar Venda</h2>
+        <div class="venda-area">
+            <div class="select-cliente-produto">
+                <div class="form-group"><label>Cliente</label><select id="selectClienteVenda"></select></div>
+                <div class="form-group"><label>Produto</label><select id="selectProdutoVenda"></select></div>
+                <div class="form-group"><label>Quantidade</label><input type="number" id="qtdProduto" value="1" min="1"></div>
+                <div><button id="btnAddItemVenda" style="margin-top:1.6rem">➕ Adicionar</button></div>
+            </div>
+            <div><h3>Itens da Venda</h3><table><thead><tr><th>Produto</th><th>Preço Unit.</th><th>Qtd</th><th>Subtotal</th><th>Ação</th></tr></thead><tbody id="itensVendaBody"></tbody></table><div class="total-carga" id="totalVenda">Total: R$ 0,00</div></div>
+            <div class="finalizar"><button id="btnFinalizarVenda" class="btn-success">✅ Finalizar</button><button id="btnCancelarVenda" class="btn-secondary">🗑️ Cancelar</button></div>
+        </div>
+    </div>
+
+    <!-- Aba Pedido de Carga Multiclientes -->
+    <div id="carga" class="tab-content">
+        <h2>🚛 Pedido de Carga (Vários Clientes na mesma A4)</h2>
+        <div class="carga-area">
+            <div style="background:#f8fafc; padding:1rem; border-radius:16px;">
+                <h3>➕ Adicionar pedido de um cliente</h3>
+                <div class="select-cliente-produto">
+                    <div class="form-group"><label>Cliente</label><select id="selectClienteCarga"></select></div>
+                    <div class="form-group"><label>Produto</label><select id="selectProdutoCarga"></select></div>
+                    <div class="form-group"><label>Quantidade</label><input type="number" id="qtdProdutoCarga" value="1" min="1"></div>
+                    <div><button id="btnAddItemCargaTemp" style="margin-top:1.6rem">➕ Adicionar item</button></div>
+                </div>
+                <div style="margin-top:1rem"><strong>Itens para este cliente:</strong></div>
+                <table style="width:100%"><thead><tr><th>Produto</th><th>Qtd</th><th>Ação</th></tr></thead><tbody id="tempCarrinhoBody"></tbody></table>
+                <div class="finalizar" style="margin-top:1rem; justify-content:flex-start">
+                    <button id="btnAdicionarClienteNaCarga" class="btn-success">📌 Adicionar cliente à carga</button>
+                    <button id="btnLimparTemp" class="btn-secondary">🗑️ Limpar itens</button>
+                </div>
+            </div>
+            <div><h3>📋 Clientes na Carga Consolidada</h3>
+                <div class="table-wrapper"><table id="tabelaClientesCargaConsolidada"><thead><tr><th>Cliente</th><th>Itens</th><th>Total unidades</th><th>Ações</th></tr></thead><tbody id="clientesCargaBody"></tbody></table></div>
+                <div class="total-carga" id="totalCargaConsolidada">📦 Total Geral: 0</div>
+            </div>
+            <div class="finalizar">
+                <button id="btnGerarCargaConsolidada" class="btn-print">🖨️ Gerar Pedido de Carga (PDF/Imprimir)</button>
+                <button id="btnCancelarCargaConsolidada" class="btn-danger">🗑️ Cancelar carga atual</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Histórico Vendas -->
+    <div id="historico" class="tab-content">
+        <h2>📋 Vendas Realizadas</h2>
+        <div class="historico-header"><div class="filtro-periodo"><input type="date" id="filtroDataInicio"><input type="date" id="filtroDataFim"><button id="btnFiltrarVendas" class="btn-secondary">🔍 Filtrar</button><button id="btnLimparFiltroVendas" class="btn-secondary">🗑️ Limpar</button></div><div><button id="btnExportarExcel" class="btn-excel">📊 Excel</button></div></div>
+        <div class="historico"><table id="tabelaHistorico"><thead><tr><th>#</th><th>Data</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Ações</th></tr></thead><tbody id="historicoBody"></tbody></table></div>
+        <div><button id="limparHistorico" class="btn-danger">🗑️ Limpar Histórico de Vendas</button></div>
+    </div>
+
+    <!-- Histórico Cargas -->
+    <div id="historicoCarga" class="tab-content">
+        <h2>📋 Pedidos de Carga</h2>
+        <div class="historico-carga-header"><div class="filtro-periodo"><input type="date" id="filtroCargaInicio"><input type="date" id="filtroCargaFim"><select id="filtroClienteCarga"><option value="">Todos os clientes</option></select><button id="btnFiltrarCargas" class="btn-secondary">🔍 Filtrar</button><button id="btnLimparFiltroCarga" class="btn-secondary">🗑️ Limpar</button></div><div><button id="btnExportarCargasExcel" class="btn-excel">📊 Excel</button></div></div>
+        <div class="historico-carga"><table id="tabelaHistoricoCarga"><thead><tr><th>#</th><th>Data</th><th>Clientes envolvidos</th><th>Itens (resumo)</th><th>Total Unid.</th><th>Ações</th></tr></thead><tbody id="historicoCargaBody"></tbody></table></div>
+        <div><button id="limparHistoricoCarga" class="btn-danger">🗑️ Limpar Histórico de Cargas</button></div>
+    </div>
+</div>
+
+<!-- Modais fixos -->
+<div id="printModalVenda" class="print-modal"><div class="print-modal-content"><div class="print-header"><h2>📄 Pedido de Venda</h2><button class="close-modal" onclick="fecharModalVenda()">✖</button></div><div id="printVendaContent"></div><div class="modal-buttons"><button onclick="imprimirVenda()" class="btn-print">🖨️ Imprimir</button><button onclick="gerarPDFVenda()" class="btn-pdf">📄 PDF</button><button onclick="fecharModalVenda()" class="btn-secondary">Fechar</button></div></div></div>
+<div id="printModalCarga" class="print-modal"><div class="print-modal-content"><div class="print-header"><h2>🚛 Pedido de Carga Consolidado</h2><button class="close-modal" onclick="fecharModalCarga()">✖</button></div><div id="printCargaContent"></div><div class="modal-buttons"><button onclick="imprimirCarga()" class="btn-print">🖨️ Imprimir</button><button onclick="gerarPDFCarga()" class="btn-pdf">📄 PDF</button><button onclick="fecharModalCarga()" class="btn-secondary">Fechar</button></div></div></div>
+
+<script>
+    // ======================= DADOS GLOBAIS =======================
+    let clientes = [], produtos = [], vendas = [], carrinho = [], vendasFiltradas = [];
+    let nextIdCliente = 1, nextIdProduto = 1, nextIdVenda = 1;
+    let cargas = [], nextIdCarga = 1, cargasFiltradas = [];
+    let cargaConsolidadaClientes = [];   // { clienteId, clienteNome, itens: [{produtoNome, quantidade}] }
+    let tempCarrinhoItens = [];          // itens temporários para o cliente atual
+
+    // ======================= PERSISTÊNCIA =======================
+    function carregarDados() {
+        try {
+            const storedClientes = localStorage.getItem("clientes");
+            const storedProdutos = localStorage.getItem("produtos");
+            const storedVendas = localStorage.getItem("vendas");
+            const storedCargas = localStorage.getItem("cargas");
+            if(storedClientes) { clientes = JSON.parse(storedClientes); nextIdCliente = clientes.length ? Math.max(...clientes.map(c=>c.id)) + 1 : 1; }
+            if(storedProdutos) { produtos = JSON.parse(storedProdutos); nextIdProduto = produtos.length ? Math.max(...produtos.map(p=>p.id)) + 1 : 1; }
+            if(storedVendas) { vendas = JSON.parse(storedVendas); nextIdVenda = vendas.length ? Math.max(...vendas.map(v=>v.id)) + 1 : 1; }
+            if(storedCargas) { cargas = JSON.parse(storedCargas); nextIdCarga = cargas.length ? Math.max(...cargas.map(c=>c.id)) + 1 : 1; }
+        } catch(e) { console.error(e); }
+        vendasFiltradas = [...vendas];
+        cargasFiltradas = [...cargas];
+    }
+    function salvarClientes() { localStorage.setItem("clientes", JSON.stringify(clientes)); }
+    function salvarProdutos() { localStorage.setItem("produtos", JSON.stringify(produtos)); }
+    function salvarVendas() { localStorage.setItem("vendas", JSON.stringify(vendas)); }
+    function salvarCargas() { localStorage.setItem("cargas", JSON.stringify(cargas)); }
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m])); }
+
+    // ======================= CLIENTES E PRODUTOS =======================
+    function renderizarClientes() {
+        const tbody = document.querySelector("#tabelaClientes tbody");
+        tbody.innerHTML = "";
+        clientes.forEach(c => {
+            tbody.innerHTML += `<tr><td>${c.id}</td><td>${escapeHtml(c.nome)}</td><td>${escapeHtml(c.documento)}</td><td>${escapeHtml(c.telefone)}</td><td class="actions"><button class="editarCliente" data-id="${c.id}">✏️</button><button class="excluirCliente" data-id="${c.id}">🗑️</button></td></tr>`;
+        });
+        document.querySelectorAll(".editarCliente").forEach(btn => btn.addEventListener("click", () => editarCliente(parseInt(btn.dataset.id))));
+        document.querySelectorAll(".excluirCliente").forEach(btn => btn.addEventListener("click", () => { if(confirm("Remover cliente?")) { clientes = clientes.filter(c => c.id !== parseInt(btn.dataset.id)); salvarClientes(); renderizarClientes(); carregarSelectClientes(); carregarSelectClientesCarga(); carregarFiltroClienteCarga(); } }));
+    }
+    function editarCliente(id) {
+        const c = clientes.find(c => c.id === id);
+        if(!c) return;
+        const nn = prompt("Novo nome:", c.nome); if(nn) c.nome = nn;
+        const nd = prompt("Novo documento:", c.documento); if(nd) c.documento = nd;
+        const nf = prompt("Novo telefone:", c.telefone); if(nf) c.telefone = nf;
+        salvarClientes(); renderizarClientes(); carregarSelectClientes(); carregarSelectClientesCarga(); carregarFiltroClienteCarga();
+    }
+    function renderizarProdutos() {
+        const tbody = document.querySelector("#tabelaProdutos tbody");
+        tbody.innerHTML = "";
+        produtos.forEach(p => {
+            tbody.innerHTML += `<tr><td>${p.id}</td><td>${escapeHtml(p.nome)}</td><td>R$ ${p.preco.toFixed(2)}</td><td class="actions"><button class="editarProduto" data-id="${p.id}">✏️</button><button class="excluirProduto" data-id="${p.id}">🗑️</button></td></tr>`;
+        });
+        document.querySelectorAll(".editarProduto").forEach(btn => btn.addEventListener("click", () => editarProduto(parseInt(btn.dataset.id))));
+        document.querySelectorAll(".excluirProduto").forEach(btn => btn.addEventListener("click", () => { if(confirm("Remover produto?")) { produtos = produtos.filter(p => p.id !== parseInt(btn.dataset.id)); salvarProdutos(); renderizarProdutos(); carregarSelectProdutos(); carregarSelectProdutosCarga(); } }));
+    }
+    function editarProduto(id) {
+        const p = produtos.find(p => p.id === id);
+        if(!p) return;
+        const nn = prompt("Novo nome:", p.nome); if(nn) p.nome = nn;
+        const np = parseFloat(prompt("Novo preço:", p.preco)); if(!isNaN(np) && np>=0) p.preco = np;
+        salvarProdutos(); renderizarProdutos(); carregarSelectProdutos(); carregarSelectProdutosCarga();
+    }
+    function carregarSelectClientes() {
+        const s = document.getElementById("selectClienteVenda");
+        s.innerHTML = '<option value="">-- Selecione --</option>';
+        clientes.forEach(c => { const opt = document.createElement("option"); opt.value = c.id; opt.textContent = `${c.nome}`; s.appendChild(opt); });
+    }
+    function carregarSelectProdutos() {
+        const s = document.getElementById("selectProdutoVenda");
+        s.innerHTML = '<option value="">-- Selecione --</option>';
+        produtos.forEach(p => { const opt = document.createElement("option"); opt.value = p.id; opt.textContent = `${p.nome} - R$ ${p.preco.toFixed(2)}`; s.appendChild(opt); });
+    }
+    function carregarSelectClientesCarga() {
+        const s = document.getElementById("selectClienteCarga");
+        s.innerHTML = '<option value="">-- Selecione --</option>';
+        clientes.forEach(c => { const opt = document.createElement("option"); opt.value = c.id; opt.textContent = c.nome; s.appendChild(opt); });
+    }
+    function carregarSelectProdutosCarga() {
+        const s = document.getElementById("selectProdutoCarga");
+        s.innerHTML = '<option value="">-- Selecione --</option>';
+        produtos.forEach(p => { const opt = document.createElement("option"); opt.value = p.id; opt.textContent = p.nome; s.appendChild(opt); });
+    }
+
+    // ======================= VENDAS =======================
+    function renderizarCarrinhoVenda() {
+        const tbody = document.getElementById("itensVendaBody");
+        tbody.innerHTML = "";
+        let total = 0;
+        carrinho.forEach((item, idx) => {
+            total += item.subtotal;
+            tbody.innerHTML += `<tr><td>${escapeHtml(item.produtoNome)}</td><td>R$ ${item.preco.toFixed(2)}</td><td>${item.qtd}</td><td>R$ ${item.subtotal.toFixed(2)}</td><td><button class="removerItemVenda" data-idx="${idx}">Remover</button></td></tr>`;
+        });
+        document.getElementById("totalVenda").innerHTML = `Total: R$ ${total.toFixed(2)}`;
+        document.querySelectorAll(".removerItemVenda").forEach(btn => btn.addEventListener("click", () => { carrinho.splice(parseInt(btn.dataset.idx),1); renderizarCarrinhoVenda(); }));
+    }
+    function adicionarItemVenda() {
+        const pid = parseInt(document.getElementById("selectProdutoVenda").value);
+        const qtd = parseInt(document.getElementById("qtdProduto").value);
+        if(!pid || isNaN(qtd) || qtd<=0) { alert("Selecione produto e quantidade"); return; }
+        const p = produtos.find(p => p.id === pid);
+        if(!p) return;
+        carrinho.push({ produtoNome: p.nome, preco: p.preco, qtd, subtotal: p.preco * qtd });
+        renderizarCarrinhoVenda();
+        document.getElementById("qtdProduto").value = "1";
+    }
+    function finalizarVenda() {
+        const cid = document.getElementById("selectClienteVenda").value;
+        if(!cid) { alert("Selecione um cliente"); return; }
+        if(carrinho.length === 0) { alert("Adicione itens"); return; }
+        const cliente = clientes.find(c => c.id == cid);
+        const total = carrinho.reduce((s,i)=>s+i.subtotal,0);
+        const novaVenda = { id: nextIdVenda++, data: new Date().toLocaleString(), clienteNome: cliente.nome, itens: carrinho.map(i=>({ produtoNome: i.produtoNome, preco: i.preco, qtd: i.qtd, subtotal: i.subtotal })), total };
+        vendas.push(novaVenda);
+        salvarVendas();
+        mostrarModalImpressaoVenda(novaVenda);
+        carrinho = [];
+        renderizarCarrinhoVenda();
+        document.getElementById("selectClienteVenda").value = "";
+        aplicarFiltroVendas();
+    }
+    function cancelarVenda() { if(carrinho.length && confirm("Cancelar venda?")) { carrinho = []; renderizarCarrinhoVenda(); } }
+    function aplicarFiltroVendas() {
+        const inicio = document.getElementById("filtroDataInicio").value;
+        const fim = document.getElementById("filtroDataFim").value;
+        vendasFiltradas = vendas.filter(v => {
+            const dataStr = v.data.split(",")[0].split("/").reverse().join("-");
+            if(inicio && dataStr < inicio) return false;
+            if(fim && dataStr > fim) return false;
+            return true;
+        });
+        renderizarHistoricoVendas();
+    }
+    function renderizarHistoricoVendas() {
+        const tbody = document.getElementById("historicoBody");
+        tbody.innerHTML = "";
+        if(vendasFiltradas.length === 0) { tbody.innerHTML = "<tr><td colspan='6'>Nenhuma venda</td></tr>"; return; }
+        vendasFiltradas.slice().reverse().forEach(v => {
+            const itens = v.itens.map(i=>`${i.produtoNome}(${i.qtd})`).join(", ");
+            tbody.innerHTML += `<tr><td>${v.id}</td><td>${escapeHtml(v.data)}</td><td>${escapeHtml(v.clienteNome)}</td><td>${escapeHtml(itens.substring(0,80))}</td><td>R$ ${v.total.toFixed(2)}</td><td><button class="reimprimirVenda" data-id="${v.id}" style="background:#f59e0b;">🖨️ Reimprimir</button></td></tr>`;
+        });
+        document.querySelectorAll(".reimprimirVenda").forEach(btn => btn.addEventListener("click", () => { const v = vendas.find(v=>v.id===parseInt(btn.dataset.id)); if(v) mostrarModalImpressaoVenda(v); }));
+    }
+    function limparHistoricoVendas() { if(confirm("Apagar todas as vendas?")) { vendas = []; salvarVendas(); aplicarFiltroVendas(); } }
+    function exportarExcelVendas() { if(!vendas.length) return; const dados = [["ID","Data","Cliente","Itens","Total"]]; vendas.forEach(v=>dados.push([v.id,v.data,v.clienteNome,v.itens.map(i=>`${i.produtoNome}(${i.qtd})`).join("; "),v.total])); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dados), "Vendas"); XLSX.writeFile(wb, `vendas_${Date.now()}.xlsx`); }
+    // Modal Venda
+    function gerarHtmlVenda(venda) {
+        let itensHtml = ""; venda.itens.forEach(i => { itensHtml += `<tr><td>${escapeHtml(i.produtoNome)}</td><td>${i.qtd}</td><td>R$ ${i.preco.toFixed(2)}</td><td>R$ ${i.subtotal.toFixed(2)}</td></tr>`; });
+        return `<div style="font-family:monospace; max-width:800px; margin:auto; padding:20px;"><div style="text-align:center"><h2>🛍️ PEDIDO DE VENDA</h2><hr><p>Nº ${venda.id}</p><p>Cliente: ${escapeHtml(venda.clienteNome)}</p><p>Data: ${venda.data}</p></div><table style="width:100%; border-collapse:collapse"><thead><tr><th>Produto</th><th>Qtd</th><th>Preço</th><th>Subtotal</th></tr></thead><tbody>${itensHtml}</tbody><tfoot><tr><td colspan="3" style="text-align:right">TOTAL:</td><td>R$ ${venda.total.toFixed(2)}</td></tr></tfoot></table></div>`;
+    }
+    function mostrarModalImpressaoVenda(venda) {
+        document.getElementById("printVendaContent").innerHTML = gerarHtmlVenda(venda);
+        document.getElementById("printModalVenda").style.display = "flex";
+    }
+    window.fecharModalVenda = () => document.getElementById("printModalVenda").style.display = "none";
+    window.imprimirVenda = () => {
+        const conteudo = document.getElementById("printVendaContent").innerHTML;
+        const win = window.open('', '_blank');
+        win.document.write(`<html><head><title>Pedido de Venda</title><style>body{font-family:monospace;padding:20px} table{border-collapse:collapse;width:100%} th,td{border:1px solid #ddd;padding:8px}</style></head><body>${conteudo}<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script></body></html>`);
+        win.document.close();
+    };
+    window.gerarPDFVenda = () => { const el = document.getElementById("printVendaContent").firstElementChild; if(el) html2pdf().set({ margin: [0.5,0.5,0.5,0.5], filename: `venda_${Date.now()}.pdf` }).from(el).save(); };
+
+    // ======================= PEDIDO DE CARGA MULTICLIENTE =======================
+    function renderizarTempCarrinho() {
+        const tbody = document.getElementById("tempCarrinhoBody");
+        tbody.innerHTML = "";
+        tempCarrinhoItens.forEach((item, idx) => {
+            tbody.innerHTML += `<tr><td>${escapeHtml(item.produtoNome)}</td><td>${item.quantidade}</td><td><button class="removerTempItem" data-idx="${idx}">Remover</button></td></tr>`;
+        });
+        document.querySelectorAll(".removerTempItem").forEach(btn => btn.addEventListener("click", () => { tempCarrinhoItens.splice(parseInt(btn.dataset.idx),1); renderizarTempCarrinho(); }));
+    }
+    function adicionarItemTemp() {
+        const pid = parseInt(document.getElementById("selectProdutoCarga").value);
+        const qtd = parseInt(document.getElementById("qtdProdutoCarga").value);
+        if(!pid || isNaN(qtd) || qtd<=0) { alert("Selecione produto e quantidade"); return; }
+        const p = produtos.find(p=>p.id===pid);
+        if(!p) return;
+        tempCarrinhoItens.push({ produtoNome: p.nome, quantidade: qtd });
+        renderizarTempCarrinho();
+        document.getElementById("qtdProdutoCarga").value = "1";
+    }
+    function limparTemp() { tempCarrinhoItens = []; renderizarTempCarrinho(); }
+    function adicionarClienteNaCarga() {
+        const cid = document.getElementById("selectClienteCarga").value;
+        if(!cid) { alert("Selecione um cliente"); return; }
+        if(tempCarrinhoItens.length === 0) { alert("Adicione itens para este cliente"); return; }
+        const cliente = clientes.find(c=>c.id==cid);
+        cargaConsolidadaClientes.push({ clienteId: cliente.id, clienteNome: cliente.nome, itens: [...tempCarrinhoItens] });
+        tempCarrinhoItens = [];
+        renderizarTempCarrinho();
+        renderizarClientesCarga();
+    }
+    function renderizarClientesCarga() {
+        const tbody = document.getElementById("clientesCargaBody");
+        tbody.innerHTML = "";
+        let totalGeral = 0;
+        cargaConsolidadaClientes.forEach((cli, idx) => {
+            const itensStr = cli.itens.map(i=>`${i.produtoNome}(${i.quantidade})`).join(", ");
+            const totalCli = cli.itens.reduce((s,i)=>s+i.quantidade,0);
+            totalGeral += totalCli;
+            tbody.innerHTML += `<tr><td>${escapeHtml(cli.clienteNome)}</td><td>${escapeHtml(itensStr)}</td><td>${totalCli}</td><td><button class="removerClienteCarga" data-idx="${idx}">Remover</button></td></tr>`;
+        });
+        document.getElementById("totalCargaConsolidada").innerHTML = `📦 Total Geral de Unidades: ${totalGeral}`;
+        document.querySelectorAll(".removerClienteCarga").forEach(btn => btn.addEventListener("click", () => { cargaConsolidadaClientes.splice(parseInt(btn.dataset.idx),1); renderizarClientesCarga(); }));
+    }
+    function gerarCargaConsolidada() {
+        if(cargaConsolidadaClientes.length === 0) { alert("Adicione pelo menos um cliente com itens."); return; }
+        const totalUnidades = cargaConsolidadaClientes.flatMap(c=>c.itens).reduce((s,i)=>s+i.quantidade,0);
+        const novaCarga = {
+            id: nextIdCarga++,
+            data: new Date().toLocaleString(),
+            multicliente: true,
+            clientes: cargaConsolidadaClientes.map(c => ({ clienteNome: c.clienteNome, itens: c.itens })),
+            totalUnidades
+        };
+        cargas.push(novaCarga);
+        salvarCargas();
+        mostrarModalImpressaoCarga(novaCarga);
+        cargaConsolidadaClientes = [];
+        renderizarClientesCarga();
+        carregarFiltroClienteCarga();
+        aplicarFiltroCarga();
+    }
+    function cancelarCargaConsolidada() { if(cargaConsolidadaClientes.length && confirm("Cancelar toda a carga atual?")) { cargaConsolidadaClientes = []; tempCarrinhoItens = []; renderizarTempCarrinho(); renderizarClientesCarga(); } }
+    function gerarHtmlCarga(carga) {
+        let html = `<div style="font-family:Arial; max-width:1100px; margin:auto; padding:20px;"><div style="text-align:center"><h2>🚛 PEDIDO DE CARGA</h2><hr><p><strong>Nº ${carga.id}</strong> - ${carga.data}</p><p><strong>Total de Unidades: ${carga.totalUnidades}</strong></p></div>`;
+        if(carga.multicliente) {
+            carga.clientes.forEach(cl => {
+                const totalCliente = cl.itens.reduce((s,i)=>s+i.quantidade,0);
+                html += `<div class="cliente-card"><h4>👤 ${escapeHtml(cl.clienteNome)} (${totalCliente} unid.)</h4><table class="small-table"><thead><tr><th>Produto</th><th>Quantidade</th></tr></thead><tbody>`;
+                cl.itens.forEach(i => { html += `<tr><td>${escapeHtml(i.produtoNome)}</td><td>${i.quantidade}</td></tr>`; });
+                html += `</tbody></table></div>`;
+            });
+        } else { // cargas antigas (simples)
+            html += `<div class="cliente-card"><h4>👤 ${escapeHtml(carga.clienteNome)}</h4><table class="small-table"><thead><tr><th>Produto</th><th>Quantidade</th></tr></thead><tbody>`;
+            carga.itens.forEach(i => { html += `<tr><td>${escapeHtml(i.produtoNome)}</td><td>${i.quantidade}</td></tr>`; });
+            html += `</tbody></table></div>`;
+        }
+        html += `<div style="margin-top:20px; text-align:center; font-size:12px;"><hr>Documento gerado pelo BabyJr</div></div>`;
+        return html;
+    }
+    function mostrarModalImpressaoCarga(carga) {
+        document.getElementById("printCargaContent").innerHTML = gerarHtmlCarga(carga);
+        document.getElementById("printModalCarga").style.display = "flex";
+    }
+    window.fecharModalCarga = () => document.getElementById("printModalCarga").style.display = "none";
+    window.imprimirCarga = () => {
+        const conteudo = document.getElementById("printCargaContent").innerHTML;
+        const win = window.open('', '_blank');
+        win.document.write(`<html><head><title>Pedido de Carga</title><style>body{font-family:Arial;padding:20px} .cliente-card{margin-bottom:20px; padding:15px; border-left:4px solid #3b82f6; background:#f9f9ff} .small-table{width:100%; border-collapse:collapse} .small-table th,.small-table td{border:1px solid #ccc; padding:6px}</style></head><body>${conteudo}<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script></body></html>`);
+        win.document.close();
+    };
+    window.gerarPDFCarga = () => { const el = document.getElementById("printCargaContent").firstElementChild; if(el) html2pdf().set({ margin: [0.5,0.5,0.5,0.5], filename: `carga_${Date.now()}.pdf` }).from(el).save(); };
+
+    // Histórico de Cargas (compatível)
+    function carregarFiltroClienteCarga() {
+        const s = document.getElementById("filtroClienteCarga");
+        s.innerHTML = '<option value="">Todos os clientes</option>';
+        const nomes = new Set();
+        cargas.forEach(c => {
+            if(c.multicliente) c.clientes.forEach(cl => nomes.add(cl.clienteNome));
+            else nomes.add(c.clienteNome);
+        });
+        nomes.forEach(n => { const opt = document.createElement("option"); opt.value = n; opt.textContent = n; s.appendChild(opt); });
+    }
+    function aplicarFiltroCarga() {
+        const inicio = document.getElementById("filtroCargaInicio").value;
+        const fim = document.getElementById("filtroCargaFim").value;
+        const clienteNome = document.getElementById("filtroClienteCarga").value;
+        cargasFiltradas = cargas.filter(c => {
+            const dataStr = c.data.split(",")[0].split("/").reverse().join("-");
+            if(inicio && dataStr < inicio) return false;
+            if(fim && dataStr > fim) return false;
+            if(clienteNome) {
+                if(c.multicliente) return c.clientes.some(cl => cl.clienteNome === clienteNome);
+                else return c.clienteNome === clienteNome;
+            }
+            return true;
+        });
+        renderizarHistoricoCarga();
+    }
+    function renderizarHistoricoCarga() {
+        const tbody = document.getElementById("historicoCargaBody");
+        tbody.innerHTML = "";
+        if(cargasFiltradas.length === 0) { tbody.innerHTML = "<tr><td colspan='6'>Nenhuma carga</td></tr>"; return; }
+        cargasFiltradas.slice().reverse().forEach(c => {
+            let clientesStr = "", itensResumo = "";
+            if(c.multicliente) {
+                clientesStr = c.clientes.map(cl=>cl.clienteNome).join(", ");
+                itensResumo = c.clientes.flatMap(cl=>cl.itens.map(i=>`${i.produtoNome}(${i.quantidade})`)).join(", ").substring(0,80);
+            } else {
+                clientesStr = c.clienteNome;
+                itensResumo = c.itens.map(i=>`${i.produtoNome}(${i.quantidade})`).join(", ").substring(0,80);
+            }
+            tbody.innerHTML += `<tr><td>${c.id}</td><td>${escapeHtml(c.data)}</td><td>${escapeHtml(clientesStr)}</td><td>${escapeHtml(itensResumo)}</td><td>${c.totalUnidades}</td><td><button class="reimprimirCargaBtn" data-id="${c.id}" style="background:#f59e0b;">🖨️</button></td></tr>`;
+        });
+        document.querySelectorAll(".reimprimirCargaBtn").forEach(btn => btn.addEventListener("click", () => { const c = cargas.find(c=>c.id===parseInt(btn.dataset.id)); if(c) mostrarModalImpressaoCarga(c); }));
+    }
+    function limparHistoricoCarga() { if(confirm("Apagar todas as cargas?")) { cargas = []; salvarCargas(); cargasFiltradas = []; renderizarHistoricoCarga(); carregarFiltroClienteCarga(); } }
+    function exportarCargasExcel() {
+        if(!cargas.length) return;
+        const dados = [["ID","Data","Clientes","Itens Resumo","Total Unidades"]];
+        cargas.forEach(c => {
+            let clientesStr, itensStr;
+            if(c.multicliente) { clientesStr = c.clientes.map(cl=>cl.clienteNome).join(";"); itensStr = c.clientes.flatMap(cl=>cl.itens.map(i=>`${i.produtoNome}:${i.quantidade}`)).join(", "); }
+            else { clientesStr = c.clienteNome; itensStr = c.itens.map(i=>`${i.produtoNome}:${i.quantidade}`).join(", "); }
+            dados.push([c.id, c.data, clientesStr, itensStr, c.totalUnidades]);
+        });
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dados), "Cargas"); XLSX.writeFile(wb, `cargas_${Date.now()}.xlsx`);
+    }
+
+    // ======================= INICIALIZAÇÃO =======================
+    function init() {
+        carregarDados();
+        renderizarClientes();
+        renderizarProdutos();
+        carregarSelectClientes();
+        carregarSelectProdutos();
+        carregarSelectClientesCarga();
+        carregarSelectProdutosCarga();
+        renderizarHistoricoVendas();
+        renderizarCarrinhoVenda();
+        renderizarHistoricoCarga();
+        carregarFiltroClienteCarga();
+        // Eventos
+        document.getElementById("btnAddCliente").addEventListener("click", () => { const n=document.getElementById("cliNome").value.trim(), d=document.getElementById("cliDoc").value.trim(), f=document.getElementById("cliFone").value.trim(); if(!n) return; clientes.push({id:nextIdCliente++, nome:n, documento:d, telefone:f}); salvarClientes(); renderizarClientes(); carregarSelectClientes(); carregarSelectClientesCarga(); carregarFiltroClienteCarga(); document.getElementById("cliNome").value=""; document.getElementById("cliDoc").value=""; document.getElementById("cliFone").value=""; });
+        document.getElementById("btnAddProduto").addEventListener("click", () => { const n=document.getElementById("prodNome").value.trim(), p=parseFloat(document.getElementById("prodPreco").value); if(!n||isNaN(p)||p<=0) return; produtos.push({id:nextIdProduto++, nome:n, preco:p}); salvarProdutos(); renderizarProdutos(); carregarSelectProdutos(); carregarSelectProdutosCarga(); document.getElementById("prodNome").value=""; document.getElementById("prodPreco").value=""; });
+        document.getElementById("btnAddItemVenda").addEventListener("click", adicionarItemVenda);
+        document.getElementById("btnFinalizarVenda").addEventListener("click", finalizarVenda);
+        document.getElementById("btnCancelarVenda").addEventListener("click", cancelarVenda);
+        document.getElementById("limparHistorico").addEventListener("click", limparHistoricoVendas);
+        document.getElementById("btnExportarExcel").addEventListener("click", exportarExcelVendas);
+        document.getElementById("btnFiltrarVendas").addEventListener("click", aplicarFiltroVendas);
+        document.getElementById("btnLimparFiltroVendas").addEventListener("click", () => { document.getElementById("filtroDataInicio").value=""; document.getElementById("filtroDataFim").value=""; aplicarFiltroVendas(); });
+        document.getElementById("btnAddItemCargaTemp").addEventListener("click", adicionarItemTemp);
+        document.getElementById("btnLimparTemp").addEventListener("click", limparTemp);
+        document.getElementById("btnAdicionarClienteNaCarga").addEventListener("click", adicionarClienteNaCarga);
+        document.getElementById("btnGerarCargaConsolidada").addEventListener("click", gerarCargaConsolidada);
+        document.getElementById("btnCancelarCargaConsolidada").addEventListener("click", cancelarCargaConsolidada);
+        document.getElementById("btnFiltrarCargas").addEventListener("click", aplicarFiltroCarga);
+        document.getElementById("btnLimparFiltroCarga").addEventListener("click", () => { document.getElementById("filtroCargaInicio").value=""; document.getElementById("filtroCargaFim").value=""; document.getElementById("filtroClienteCarga").value=""; aplicarFiltroCarga(); });
+        document.getElementById("limparHistoricoCarga").addEventListener("click", limparHistoricoCarga);
+        document.getElementById("btnExportarCargasExcel").addEventListener("click", exportarCargasExcel);
+        // Abas
+        const tabs = document.querySelectorAll(".tab-btn"), contents = document.querySelectorAll(".tab-content");
+        tabs.forEach(btn => btn.addEventListener("click", () => { const tabId = btn.dataset.tab; contents.forEach(c=>c.classList.remove("active")); tabs.forEach(b=>b.classList.remove("active")); document.getElementById(tabId).classList.add("active"); btn.classList.add("active"); if(tabId === "historicoCarga") renderizarHistoricoCarga(); }));
+    }
+    init();
+</script>
+</body>
+</html>
